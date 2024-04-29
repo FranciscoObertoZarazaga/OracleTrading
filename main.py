@@ -1,3 +1,5 @@
+import numpy as np
+
 from SqueezeMomentumIndicator import *
 from Indicator import *
 from HistoricalKlines import HistoricalKlines
@@ -13,20 +15,45 @@ warnings.filterwarnings("ignore")
 symbol = 'BTCUSDT'
 start_str = '7 year ago'
 end_str = None
-interval = KLINE_INTERVAL_1HOUR
-src = 'klines/4hour_kline_btc.csv'
+interval = KLINE_INTERVAL_15MINUTE
+src = 'klines/15min_kline_btc.csv'
 
 hk = HistoricalKlines(symbol=symbol,start_str=start_str,end_str=end_str, interval=interval,src=src)
 kline = hk.getKlines()
 
-kline['sm'] = SqueezeMomentumIndicator(kline)
-kline['isSm'] = isSqueeze(kline)
+#kline['sm'] = SqueezeMomentumIndicator(kline)
 kline['adx'], kline['di+'], kline['di-'] = adxIndicator(kline)
 kline['rsi'] = rsiIndicator(kline,20)
-kline['sma'] = smaIndicator(kline,10)
+kline['sma'] = smaIndicator(kline,5)
 kline['ema'] = emaIndicator(kline,10)
 kline['bbh'], kline['bbm'], kline['bbl'] = bollingerBandsIndicator(kline)
+
+kp = kline.iloc[:-1]['Close']
+kf = kline.iloc[1:]['Close'].reset_index(drop=True)
+kline.drop(len(kline)-1,inplace=True)
+kline['future'] = np.where(kp < kf, True, False)
 kline.dropna(inplace=True)
+kline.reset_index(drop=True,inplace=True)
+
+conditions = list()
+#conditions.append(kline['Open'] > kline['Close'])
+c = (kline['High'] - kline['Close'] < kline['Open'] - kline['Low'])
+conditions.append(c)
+
+condition = True
+for c in conditions:
+    condition = condition & c
+
+kline['predict'] = np.where(condition, True, False)
+
+
+result = kline[kline['future'] == kline['predict'] & (kline['predict'] != np.nan)]
+kline = kline[kline['predict'] != np.nan]
+
+
+print(f'Resultado:{len(result)/len(kline):.2%}')
+print(len(kline))
+
 
 trader = Trader(symbol)
 
@@ -40,9 +67,10 @@ for i in range(len(kline)):
     price = kline['Close'][i]
     time = kline.index[i]
     indoor = trader.indoor
+    y = kline['predict'][i]
 
     points = 0
-    points += WinStrategy(kline, i)
+    points += GodStrategy(kline, i, y)
     points -= 1 if price < buy_price * .0 else 0
 
     if (indoor and points < 0) or (not indoor and points > 0):
@@ -59,9 +87,10 @@ for i in range(len(kline)):
 
 
 
-trader.sell(kline['Close'][-1], kline.index[-1])
+last = len(kline) - 1
+trader.sell(kline['Close'][last], kline.index[last])
 kline['signal'] = signal
-tiempo = datetime.strptime(kline.index[-1], '%H:%M %d-%m-%Y') - datetime.strptime(kline.index[0], '%H:%M %d-%m-%Y')
+tiempo = datetime.strptime(kline['Time'][last], '%H:%M %d-%m-%Y') - datetime.strptime(kline['Time'][0], '%H:%M %d-%m-%Y')
 print('#'*50)
 print(f'SE SIMULARON {int(tiempo.days/365)} AÑOS, {int((tiempo.days % 365) / 31)} MESES Y{(tiempo.days % 365) % 31 + tiempo.seconds/86400: .2f} DÍAS')
 print('#'*50)

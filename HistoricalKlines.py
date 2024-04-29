@@ -13,17 +13,15 @@ class HistoricalKlines:
         self.end_str = end_str
         self.src = src
         self.load()
-        self.save()
 
 
     def load(self,):
         try:
             assert self.src is not None and os.path.exists(self.src)
-            self.klines = pd.read_csv(self.src)
+            self.klines = pd.read_csv(self.src, index_col=0)
         except:
             self._download()
-        finally:
-            self.klines = self.klines.set_index('Time')
+            self.save()
 
     def save(self):
         self.klines.to_csv(self.src)

@@ -85,11 +85,11 @@ def StableSqueezeStrategy(df, n):
         return 1 if sm[n] > sm[n-1] else -1
     return 0
 
-def GodStrategy(df, n):
+def GodStrategy(df, n, y):
     price = df['Close']
-    y = price[n] < price[n+1]
-    #if y == None:
-        #return 0
+    #y = price[n] < price[n+1]
+    if y == None:
+        return 0
     if price[n] < price[n-1] and y:
         return 1
     if price[n] > price[n-1] and not y:
